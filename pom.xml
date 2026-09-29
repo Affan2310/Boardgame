@@ -2,26 +2,36 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
+
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>2.5.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
+
 	<groupId>com.javaproject</groupId>
 	<artifactId>database_service_project</artifactId>
 	<version>0.0.5-SNAPSHOT</version>
 	<name>database_service_project</name>
 	<description>Project for Spring Boot</description>
 	<packaging>jar</packaging>
+
 	<properties>
-		<java.version>11</java.version>
-		<jacoco.version>0.8.7</jacoco.version>
-   		<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
-    		<sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
-    		<sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
-    		<sonar.language>java</sonar.language>
-		
+		<!-- Bytecode level. 17 = highest Java version Spring Boot 2.5.x supports,
+		     and it matches the eclipse-temurin:17 runtime image. Builds fine on JDK 21. -->
+		<java.version>17</java.version>
+		<maven.compiler.release>17</maven.compiler.release>
+
+		<!-- Tool versions that work when the BUILD runs on JDK 21.
+		     These override the older versions managed by spring-boot-starter-parent 2.5.6. -->
+		<lombok.version>1.18.34</lombok.version>                     <!-- JDK 21 support from 1.18.30 -->
+		<maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+		<byte-buddy.version>1.14.19</byte-buddy.version>             <!-- Mockito/@MockBean on JDK 21 -->
+		<jacoco.version>0.8.12</jacoco.version>                      <!-- JDK 21 support from 0.8.11 -->
+
+		<!-- SonarQube: where the JaCoCo XML coverage report is written -->
+		<sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
 
 	<dependencies>
@@ -33,7 +43,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jdbc</artifactId>
@@ -52,9 +61,9 @@
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
@@ -70,12 +79,8 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-
-		<dependency>
-    <groupId>org.jacoco</groupId> 
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <version>0.8.7</version>
-</dependency>
+		<!-- Removed: jacoco-maven-plugin was listed here as a dependency.
+		     A Maven plugin belongs only in <build><plugins>, never in <dependencies>. -->
 	</dependencies>
 
 	<build>
@@ -93,42 +98,56 @@
 				</configuration>
 			</plugin>
 
+			<!-- Lombok as an explicit annotation processor (required behaviour on newer compilers) -->
 			<plugin>
-    <groupId>org.jacoco</groupId>
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <version>${jacoco.version}</version>
-    <executions>
-        <execution>
-            <id>jacoco-initialize</id>
-            <goals>
-                <goal>prepare-agent</goal>
-            </goals>
-        </execution>
-        <execution>
-            <id>jacoco-site</id>
-            <phase>package</phase>
-            <goals>
-                <goal>report</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<release>${maven.compiler.release}</release>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.version}</version>
+				<executions>
+					<execution>
+						<id>jacoco-initialize</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-report</id>
+						<!-- "test" (was "package") so the report exists before the SonarQube stage -->
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 
-
- <distributionManagement>
-  <repository>
-    <id>maven-releases</id>
-    <url>http://3.110.221.68:8081/repository/maven-releases/</url>
-  </repository>
-  <snapshotRepository>
-    <id>maven-snapshots</id>
-    <url>http://3.110.221.68:8081/repository/maven-snapshots/</url>
-  </snapshotRepository>
-</distributionManagement>
-
-
-	
+	<!-- Nexus PRIVATE IP: Jenkins reaches it over the VPC; public IPs change on stop/start -->
+	<distributionManagement>
+		<repository>
+			<id>maven-releases</id>
+			<url>http://172.31.1.154:8081/repository/maven-releases/</url>
+		</repository>
+		<snapshotRepository>
+			<id>maven-snapshots</id>
+			<url>http://172.31.1.154:8081/repository/maven-snapshots/</url>
+		</snapshotRepository>
+	</distributionManagement>
 
 </project>
